@@ -5,46 +5,66 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
-st.title("Skill-Based Job Designation Recommender")
+st.header("Skill-Based Job Designation Recommender")
 
-df = pd.read_csv('dataset/skill_based_data.csv')
+df = pd.read_csv("dataset/skill_based_data_noisy.csv")
 
-df.drop(['Candidate_ID','Name','Age','Gender','City','Degree','Experience_Years','Projects_Count','Certifications','Resume_Summary'], axis=1, inplace=True)
+df.drop([
+    "Candidate_ID",
+    "Name",
+    "Age",
+    "Gender",
+    "City",
+    "Degree",
+    "Experience_Years",
+    "Projects_Count",
+    "Certifications",
+    "Resume_Summary"
+], axis=1, inplace=True)
 
-skills = df.Skills
-skills = skills.apply(lambda x: ' '.join(i.strip().lower() for i in x.split(',')))
+skills = df["Skills"]
+skills = skills.apply(
+    lambda x: " ".join(i.strip().lower() for i in x.split(","))
+)
 
-df['Target_Designation'] = df['Target_Designation'].map({
-    'Front End Developer': 1,
-    'Backend Developer': 2,
-    'Data Analyst': 3,
-    'Cloud Engineer': 4,
-    'ML Engineer': 5,
-    'HR Manager': 6,
-    'Designer': 7,
-    'Digital Marketing': 8
+df["Target_Designation"] = df["Target_Designation"].map({
+    "Front End Developer": 1,
+    "Backend Developer": 2,
+    "Data Analyst": 3,
+    "Cloud Engineer": 4,
+    "ML Engineer": 5,
+    "HR Manager": 6,
+    "Designer": 7,
+    "Digital Marketing": 8
 })
 
 tfidf = TfidfVectorizer()
 x = tfidf.fit_transform(skills)
+y = df["Target_Designation"]
 
-y = df['Target_Designation']
-x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=42)
+x_train, x_test, y_train, y_test = train_test_split(
+    x, y, test_size=0.2, random_state=42
+)
 
-rnd = RandomForestClassifier(n_estimators=100, random_state=42)
+rnd = RandomForestClassifier(
+    n_estimators=100,
+    random_state=42
+)
+
 rnd.fit(x_train, y_train)
+
 y_predict = rnd.predict(x_test)
 
 accuracy = accuracy_score(y_test, y_predict)
-precision = precision_score(y_test, y_predict, average='weighted')
-recall = recall_score(y_test, y_predict, average='weighted')
-f1 = f1_score(y_test, y_predict, average='weighted')
+precision = precision_score(y_test, y_predict, average="weighted")
+recall = recall_score(y_test, y_predict, average="weighted")
+f1 = f1_score(y_test, y_predict, average="weighted")
 
-with st.expander("Model info"):
-    st.write(f"Accuracy: {accuracy*100:.2f}%")
-    st.write(f"Precision (weighted): {precision*100:.2f}%")
-    st.write(f"Recall (weighted): {recall*100:.2f}%")
-    st.write(f"F1-Score (weighted): {f1*100:.2f}%")
+with st.sidebar.expander("Model Info"):
+    st.write(f"Accuracy: {accuracy * 100:.2f}%")
+    st.write(f"Precision (weighted): {precision * 100:.2f}%")
+    st.write(f"Recall (weighted): {recall * 100:.2f}%")
+    st.write(f"F1-Score (weighted): {f1 * 100:.2f}%")
 
 designation_skills = {
     1: [
@@ -81,39 +101,119 @@ designation_skills = {
     ]
 }
 
-user_inp = st.text_input("Your skills (comma-separated)", placeholder="e.g. Python, SQL, Power BI, Excel")
+with st.sidebar.expander("Available Designations"):
+    for designation, skills in designation_skills.values():
+        st.write(designation)
+with st.sidebar:
+    st.subheader("Skills by Designation")
 
-if st.button("Recommend Designation", type="primary"):
-    if not user_inp.strip():
+    for designation, skills in designation_skills.values():
+        with st.expander(designation):
+            for skill in skills:
+                st.write(f"- {skill}")
+name = st.text_input("Enter your name")
+
+user_inp = st.text_area(
+    "Enter your skills (comma-separated)",
+    placeholder="e.g. Python, SQL, Power BI, Excel"
+)
+
+if st.button("Find My Best Role", type="secondary"):
+
+    if not name.strip():
+        st.warning("Please enter your name.")
+
+    elif not user_inp.strip():
         st.warning("Please enter at least one skill.")
-    else:
-        inp_list = [i.strip() for i in user_inp.split(',')]
-        len_of_sp = len(inp_list)
 
-        sample = [' '.join(i.strip().lower() for i in user_inp.split(','))]
+    else:
+        user_skills = set(
+            i.strip().lower()
+            for i in user_inp.split(",")
+            if i.strip()
+        )
+
+        sample = [
+            " ".join(
+                i.strip().lower()
+                for i in user_inp.split(",")
+            )
+        ]
+
         sample = tfidf.transform(sample)
+
         prediction = rnd.predict(sample)
 
         designation = designation_skills[prediction[0]][0]
-        required_skills = set(designation_skills[prediction[0]][1])
-        user_skills = set(inp_list)
 
-        missing_skills = sorted(required_skills - user_skills)
+        required_skills = set(
+            skill.lower()
+            for skill in designation_skills[prediction[0]][1]
+        )
+
+        matched_skills = required_skills.intersection(user_skills)
+
+        missing_skills = sorted(
+            required_skills - user_skills
+        )
+
         threshold = len(required_skills) / 2.5
 
-        # st.subheader(f"Predicted Designation: {designation}")
-        # st.write("User Skills :", sorted(user_skills))
-        # st.write("Required Skills :", sorted(required_skills))
-        # st.write("Missing Skills :", missing_skills)
-        # st.write("Threshold :", threshold)
+        if len(matched_skills) >= threshold:
 
-        if len(user_skills) >= threshold:
-            st.success(f"Your predicted designation is: {designation}")
-            st.write("Better if you have these skills too:")
+            st.success(
+                f"Hi {name}! Your predicted designation is: {designation}"
+            )
 
-            for skill in missing_skills:
-                st.write(f"- {skill}")
-        elif len(missing_skills) == len(required_skills):
-            st.error("You are not eligible for any of our designations.")
+            st.write(
+                "You may also benefit from having these skills:"
+            )
+
+            if missing_skills:
+                for skill in missing_skills:
+                    st.write(f"- {skill.title()}")
+            else:
+                st.write(
+                    "You already have all the required skills!"
+                )
+
+        elif len(matched_skills) == 0:
+
+            st.error(
+                f"Sorry {name}, your current skills don't match "
+                f"the requirements for any of our designations."
+            )
+
         else:
-            st.info(f"You need to learn at least {int(threshold)-len(user_skills)} more skills for {designation}.")
+
+            needed = int(threshold) - len(matched_skills)
+
+            if needed < 1:
+                needed = 1
+
+            st.info(
+                f"{name}, you need to develop at least "
+                f"{needed} more relevant skills to qualify "
+                f"for the {designation} role."
+            )
+st.markdown("""
+<style>
+.footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    text-align: center;
+    padding: 8px;
+    
+    color: gray;
+    font-size: 16px;
+    border-top: 1px solid #ddd;
+    z-index: 999;
+}
+</style>
+
+<div class="footer">
+    © 2026 Adithyan S Anil · Skill-Based Job Designation Recommender
+</div>
+""", unsafe_allow_html=True)
