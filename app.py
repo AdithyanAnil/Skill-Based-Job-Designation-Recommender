@@ -7,7 +7,7 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_sc
 
 st.header("Skill-Based Job Designation Recommender")
 
-df = pd.read_csv("dataset/skill_based_data_noisy.csv")
+df = pd.read_csv("dataset/skill_based_data_new.csv")
 
 df.drop([
     "Candidate_ID",
